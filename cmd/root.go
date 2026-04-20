@@ -136,8 +136,9 @@ func buildNewsProviders(ctx context.Context, debug bool) ([]news.NewsProvider, e
 
 	if viper.GetBool("stocklabs.enabled") {
 		p := stocklabs.NewStocklabsNewsProvider(stocklabs.NewStocklabsNewsProviderParams{
-			Ctx:   ctx,
-			Debug: debug,
+			Ctx:               ctx,
+			Debug:             debug,
+			IncludeHistorical: viper.GetBool("stocklabs.includeHistorical"),
 		})
 		providers = append(providers, p)
 	}

@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -16,7 +18,8 @@ import (
 )
 
 const (
-	stocklabsNewsStreamURL = "wss://ws.stocklabs.com/"
+	stocklabsNewsStreamURL     = "wss://ws.stocklabs.com/"
+	stocklabsHistoricalNewsURL = "https://api.stocklabs.com/news"
 
 	initialBackoff = time.Second
 	maxBackoff     = 30 * time.Second
@@ -25,21 +28,27 @@ const (
 )
 
 type StocklabsNewsProvider struct {
-	ctx         context.Context
-	newsChannel chan news.ExternalNews
-	debug       bool
+	ctx               context.Context
+	newsChannel       chan news.ExternalNews
+	debug             bool
+	includeHistorical bool
+	historicalFetched bool
+	seenNewsIDs       map[string]struct{}
 }
 
 type NewStocklabsNewsProviderParams struct {
-	Ctx   context.Context
-	Debug bool
+	Ctx               context.Context
+	Debug             bool
+	IncludeHistorical bool
 }
 
 func NewStocklabsNewsProvider(params NewStocklabsNewsProviderParams) *StocklabsNewsProvider {
 	s := &StocklabsNewsProvider{
-		ctx:         params.Ctx,
-		newsChannel: make(chan news.ExternalNews, 256),
-		debug:       params.Debug,
+		ctx:               params.Ctx,
+		newsChannel:       make(chan news.ExternalNews, 256),
+		debug:             params.Debug,
+		includeHistorical: params.IncludeHistorical,
+		seenNewsIDs:       make(map[string]struct{}),
 	}
 	go s.run()
 	return s
@@ -95,6 +104,14 @@ func (s *StocklabsNewsProvider) connectOnce() error {
 	log.Printf("websocket connected to %s", stocklabsNewsStreamURL)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
+	if s.includeHistorical && !s.historicalFetched {
+		if err := s.fetchHistoricalAndPublish(s.ctx); err != nil {
+			log.Printf("stocklabs news historical backfill failed: %v", err)
+		} else {
+			s.historicalFetched = true
+		}
+	}
+
 	return s.readLoop(s.ctx, conn)
 }
 
@@ -128,16 +145,56 @@ func (s *StocklabsNewsProvider) readLoop(ctx context.Context, conn *websocket.Co
 					s.debugLogf("skip data_update: %v", err)
 					continue
 				}
-				select {
-				case <-ctx.Done():
+				if !s.pushNews(ctx, ext) {
 					return ctx.Err()
-				case s.newsChannel <- ext:
 				}
 			default:
 				s.debugLogf("ignored message type %q: %s", env.T, string(raw))
 			}
 		}
 	}
+}
+
+func (s *StocklabsNewsProvider) fetchHistoricalAndPublish(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, stocklabsHistoricalNewsURL, nil)
+	if err != nil {
+		return fmt.Errorf("build historical request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request historical news: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("historical news request failed with status %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read historical response body: %w", err)
+	}
+
+	var parsed historicalNewsResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return fmt.Errorf("decode historical response: %w", err)
+	}
+	if !parsed.Success {
+		return fmt.Errorf("historical response returned success=false")
+	}
+
+	// API returns newest first; publish oldest->newest for a natural stream.
+	for i := len(parsed.Data) - 1; i >= 0; i-- {
+		ext, err := externalNewsFromPayload(parsed.Data[i])
+		if err != nil {
+			s.debugLogf("skip historical item: %v", err)
+			continue
+		}
+		if !s.pushNews(ctx, ext) {
+			return ctx.Err()
+		}
+	}
+	return nil
 }
 
 func splitJSONMessages(data []byte) [][]byte {
@@ -176,6 +233,11 @@ type stocklabsNewsPayload struct {
 	} `json:"profile"`
 }
 
+type historicalNewsResponse struct {
+	Success bool                   `json:"success"`
+	Data    []stocklabsNewsPayload `json:"data"`
+}
+
 func externalNewsFromDataUpdate(d json.RawMessage) (news.ExternalNews, error) {
 	var wrap dataUpdateEnvelope
 	if err := json.Unmarshal(d, &wrap); err != nil {
@@ -188,6 +250,10 @@ func externalNewsFromDataUpdate(d json.RawMessage) (news.ExternalNews, error) {
 	if err := json.Unmarshal(wrap.Data, &p); err != nil {
 		return news.ExternalNews{}, fmt.Errorf("decode news payload: %w", err)
 	}
+	return externalNewsFromPayload(p)
+}
+
+func externalNewsFromPayload(p stocklabsNewsPayload) (news.ExternalNews, error) {
 	if p.Text == "" && p.Link == "" {
 		return news.ExternalNews{}, fmt.Errorf("empty news item")
 	}
@@ -227,6 +293,21 @@ func externalNewsFromDataUpdate(d json.RawMessage) (news.ExternalNews, error) {
 		SymbolsMentioned: nil,
 		Timestamp:        ts,
 	}, nil
+}
+
+func (s *StocklabsNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {
+	if ext.ID != "" {
+		if _, seen := s.seenNewsIDs[ext.ID]; seen {
+			return true
+		}
+		s.seenNewsIDs[ext.ID] = struct{}{}
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case s.newsChannel <- ext:
+		return true
+	}
 }
 
 // xStatusIDFromURL returns the status ID from an X/Twitter status URL (path .../status/<id>).

@@ -1,6 +1,7 @@
 # Each source can be toggled independently. At least one enabled source is required.
 stocklabs:
   enabled: true
+  includeHistorical: true
 
 alpaca:
   enabled: false
@@ -12,20 +13,19 @@ filter:
   # if any of these keywords are found in the news headline, the news will be excluded.
   # case-insensitive substring match.
   excludeKeywords: []
-    # - "test"
-    # - "demo"
-    # - "example"
+    # - "canada"
+    # - "china"
+    # - "russia"
   # keywords to include in the news stream.
   # if set, only news items that contain at least one of these keywords in the headline will be included.
   # case-insensitive substring match.
   includeKeywords: []
-    # - "stock"
-    # - "market"
-    # - "economy"
+    # - "iran"
+    # - "hormuz"
+    # - "trump"
   # keywords to highlight in the news stream.
   # if set, and news items that contain at least one of these keywords in the headline, the news tile will be highlighted.
   # case-insensitive substring match.
   highlightKeywords: []
-    # - "stock"
-    # - "market"
-    # - "economy"
+    # - "strike"
+    # - "ceasefire"

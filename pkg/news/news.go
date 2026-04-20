@@ -3,6 +3,7 @@ package news
 import (
 	"context"
 	"fmt"
+	"html"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +84,7 @@ func (n *NewsProcessor) start() {
 					if !ok {
 						return
 					}
+					item = decodeHTMLEntitiesIfNeeded(item)
 					if !n.headlineAllows(item.Headline) {
 						continue
 					}
@@ -125,4 +127,20 @@ func (n *NewsProcessor) headlineAllows(headline string) bool {
 		}
 	}
 	return false
+}
+
+func decodeHTMLEntitiesIfNeeded(item ExternalNews) ExternalNews {
+	item.Headline = unescapeIfEntityLike(item.Headline)
+	item.Summary = unescapeIfEntityLike(item.Summary)
+	item.Content = unescapeIfEntityLike(item.Content)
+	item.Author = unescapeIfEntityLike(item.Author)
+	item.Source = unescapeIfEntityLike(item.Source)
+	return item
+}
+
+func unescapeIfEntityLike(s string) string {
+	if !strings.Contains(s, "&") || !strings.Contains(s, ";") {
+		return s
+	}
+	return html.UnescapeString(s)
 }

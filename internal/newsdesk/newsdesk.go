@@ -12,6 +12,11 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	regionalIndicatorA = rune(0x1F1E6)
+	regionalIndicatorZ = rune(0x1F1FF)
+)
+
 type NewsDesk struct {
 	ctx               context.Context
 	NewsProcessor     *news.NewsProcessor
@@ -25,7 +30,7 @@ type NewNewsDeskParams struct {
 	Ctx context.Context
 	// NewsProcessor is the merged, filtered stream from pkg/news.
 	NewsProcessor *news.NewsProcessor
-	// HighlightKeywords: headlines matching any keyword get a highlight style on the tile title.
+	// HighlightKeywords: headlines matching any keyword get a yellow tile border.
 	HighlightKeywords []string
 	// OnShutdown is invoked when the user quits the UI (e.g. cancel the root context). Optional but recommended.
 	OnShutdown func()
@@ -72,7 +77,7 @@ func (d *NewsDesk) Run() error {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile) // Enable standard log flags
 
 	tiles := NewTileList()
-	tiles.SetBorder(true).SetTitle(" [green]GoNewsDesk[white] · [yellow][F1[][white] logs · [yellow][q[][white] quit ")
+	tiles.SetBorder(true).SetTitle(" [green]GoNewsDesk[white] · [yellow][F1[][white] [cadetblue]logs[white] · [yellow][q[][white] [cadetblue]quit[white] ")
 
 	pages := tview.NewPages()
 	pages.AddPage("desk", tiles, true, true)
@@ -90,7 +95,7 @@ func (d *NewsDesk) Run() error {
 			SetWrap(true).
 			SetDynamicColors(true).
 			SetText(newsDetailsText(item, body))
-		textView.SetBorder(true).SetTitle(" News Details [yellow](Esc close)[white] ")
+		textView.SetBorder(true).SetTitle(" News Details · [yellow][Esc[] [cadetblue]or [yellow][Enter[] [cadetblue]close[white] ")
 
 		modal := tview.NewFlex().
 			AddItem(nil, 0, 1, false).
@@ -101,7 +106,7 @@ func (d *NewsDesk) Run() error {
 			AddItem(nil, 0, 1, false)
 
 		modal.SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
-			if ev.Key() == tcell.KeyEscape {
+			if ev.Key() == tcell.KeyEscape || ev.Key() == tcell.KeyEnter {
 				pages.RemovePage(newsModalPageID)
 				if newsModalPreviousFocus != nil {
 					app.SetFocus(newsModalPreviousFocus)
@@ -122,7 +127,7 @@ func (d *NewsDesk) Run() error {
 	}
 	d.RunNewsStream(func(item news.ExternalNews) {
 		tile := NewsTileFromExternal(item)
-		tile.Title = headlineWithHighlight(item.Headline, d.highlightKeywords)
+		tile.Highlight = headlineShouldHighlight(item.Headline, d.highlightKeywords)
 		body := tile.Body
 		tile.OnOpen = func() {
 			showNewsModal(item, body)
@@ -206,11 +211,11 @@ func (d *NewsDesk) Run() error {
 
 // NewsTileFromExternal maps a merged news item to a scrollable tile.
 func NewsTileFromExternal(n news.ExternalNews) Tile {
-	body := strings.TrimSpace(n.Summary)
+	body := strings.TrimSpace(sanitizeCountryFlags(n.Summary))
 	if body == "" {
-		body = strings.TrimSpace(n.Content)
+		body = strings.TrimSpace(sanitizeCountryFlags(n.Content))
 	}
-	meta := n.Source
+	meta := sanitizeCountryFlags(n.Source)
 	if !n.Timestamp.IsZero() {
 		if meta != "" {
 			meta += " · "
@@ -221,11 +226,17 @@ func NewsTileFromExternal(n news.ExternalNews) Tile {
 		if meta != "" {
 			meta += " · "
 		}
-		meta += n.Author
+		meta += sanitizeCountryFlags(n.Author)
+	}
+	if len(n.SymbolsMentioned) > 0 {
+		if meta != "" {
+			meta += " · "
+		}
+		meta += sanitizeCountryFlags(strings.Join(n.SymbolsMentioned, ", "))
 	}
 	var onOpen func()
 	return Tile{
-		Title:  n.Headline,
+		Title:  sanitizeCountryFlags(n.Headline),
 		Body:   body,
 		Meta:   meta,
 		OnOpen: onOpen,
@@ -279,8 +290,7 @@ func (d *NewsDesk) App() *tview.Application {
 	return d.app
 }
 
-func headlineWithHighlight(headline string, highlight []string) string {
-	escaped := tview.Escape(headline)
+func headlineShouldHighlight(headline string, highlight []string) bool {
 	h := strings.ToLower(headline)
 	for _, kw := range highlight {
 		kw = strings.ToLower(strings.TrimSpace(kw))
@@ -288,10 +298,10 @@ func headlineWithHighlight(headline string, highlight []string) string {
 			continue
 		}
 		if strings.Contains(h, kw) {
-			return "[yellow]" + escaped + "[-]"
+			return true
 		}
 	}
-	return escaped
+	return false
 }
 
 func newsDetailsText(item news.ExternalNews, body string) string {
@@ -303,14 +313,44 @@ func newsDetailsText(item news.ExternalNews, body string) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "[green]ID[-]: %s\n", tview.Escape(item.ID))
-	fmt.Fprintf(&b, "[green]Headline[-]: %s\n", tview.Escape(item.Headline))
-	fmt.Fprintf(&b, "[green]Source[-]: %s\n", tview.Escape(item.Source))
-	fmt.Fprintf(&b, "[green]Author[-]: %s\n", tview.Escape(item.Author))
+	fmt.Fprintf(&b, "[green]Headline[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Headline)))
+	fmt.Fprintf(&b, "[green]Source[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Source)))
+	fmt.Fprintf(&b, "[green]Author[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Author)))
 	fmt.Fprintf(&b, "[green]Timestamp[-]: %s\n", tview.Escape(timestamp))
 	fmt.Fprintf(&b, "[green]URL[-]: %s\n", tview.Escape(item.Url))
-	fmt.Fprintf(&b, "[green]Symbols[-]: %s\n\n", tview.Escape(symbols))
-	fmt.Fprintf(&b, "[green]Body[-]:\n%s\n\n", tview.Escape(body))
-	fmt.Fprintf(&b, "[green]Summary[-]:\n%s\n\n", tview.Escape(item.Summary))
-	fmt.Fprintf(&b, "[green]Content[-]:\n%s\n", tview.Escape(item.Content))
+	fmt.Fprintf(&b, "[green]Symbols[-]: %s\n\n", tview.Escape(sanitizeCountryFlags(symbols)))
+	fmt.Fprintf(&b, "[green]Body[-]:\n%s\n\n", tview.Escape(sanitizeCountryFlags(body)))
+	fmt.Fprintf(&b, "[green]Summary[-]:\n%s\n\n", tview.Escape(sanitizeCountryFlags(item.Summary)))
+	fmt.Fprintf(&b, "[green]Content[-]:\n%s\n", tview.Escape(sanitizeCountryFlags(item.Content)))
 	return b.String()
+}
+
+func sanitizeCountryFlags(text string) string {
+	if text == "" {
+		return text
+	}
+
+	runes := []rune(text)
+	var b strings.Builder
+	b.Grow(len(text))
+
+	for i := 0; i < len(runes); i++ {
+		if i+1 < len(runes) && isRegionalIndicator(runes[i]) && isRegionalIndicator(runes[i+1]) {
+			c1 := rune('A') + (runes[i] - regionalIndicatorA)
+			c2 := rune('A') + (runes[i+1] - regionalIndicatorA)
+			b.WriteString("[🏳 ")
+			b.WriteRune(c1)
+			b.WriteRune(c2)
+			b.WriteRune(']')
+			i++
+			continue
+		}
+		b.WriteRune(runes[i])
+	}
+
+	return b.String()
+}
+
+func isRegionalIndicator(r rune) bool {
+	return r >= regionalIndicatorA && r <= regionalIndicatorZ
 }

@@ -7,10 +7,11 @@ import (
 
 // ---- Model for one tile.
 type Tile struct {
-	Title  string // may contain [color] tags
-	Body   string // may contain [color] tags
-	Meta   string // subtitle line
-	OnOpen func()
+	Title     string // may contain [color] tags
+	Body      string // may contain [color] tags
+	Meta      string // subtitle line
+	Highlight bool   // draws a yellow border around the tile
+	OnOpen    func()
 	// cache last measured height for current width to avoid recomputing too much (optional)
 	lastWidth  int
 	lastHeight int
@@ -49,6 +50,9 @@ type TileList struct {
 	scrollY       int // number of terminal rows scrolled from the very top
 	selectedStyle tcell.Style
 	normalStyle   tcell.Style
+	lastInnerW    int
+	lastInnerH    int
+	skipKeepOnce  bool
 }
 
 func NewTileList() *TileList {
@@ -59,9 +63,24 @@ func NewTileList() *TileList {
 	}
 }
 func (tl *TileList) AddTile(t Tile) {
+	wasAtBottom := tl.isAtBottom(tl.lastInnerH, tl.lastInnerW)
+	stickSelectionToBottom := len(tl.tiles) > 0 && tl.selectedIndex == len(tl.tiles)-1
 	tl.tiles = append(tl.tiles, t)
 	if tl.selectedIndex < 0 {
 		tl.selectedIndex = 0
+	}
+	if stickSelectionToBottom {
+		tl.selectedIndex = len(tl.tiles) - 1
+	}
+	if wasAtBottom && tl.lastInnerW > 0 && tl.lastInnerH > 0 {
+		total := tl.totalHeight(tl.lastInnerW)
+		tl.scrollY = total - tl.lastInnerH
+		if tl.scrollY < 0 {
+			tl.scrollY = 0
+		}
+		// Keep bottom-follow behavior from being undone by selection visibility
+		// enforcement during the next draw.
+		tl.skipKeepOnce = true
 	}
 }
 
@@ -72,6 +91,25 @@ func (tl *TileList) yOfIndex(i, width int) int {
 		y += tl.tiles[k].MeasureHeight(width)
 	}
 	return y
+}
+
+func (tl *TileList) totalHeight(width int) int {
+	if width <= 0 {
+		return 0
+	}
+	total := 0
+	for i := range tl.tiles {
+		total += tl.tiles[i].MeasureHeight(width)
+	}
+	return total
+}
+
+func (tl *TileList) isAtBottom(viewHeight, innerWidth int) bool {
+	if viewHeight <= 0 || innerWidth <= 0 {
+		return false
+	}
+	total := tl.totalHeight(innerWidth)
+	return tl.scrollY+viewHeight >= total
 }
 
 // ensure the selected tile is fully visible inside the viewport [scrollY, scrollY+h)
@@ -109,6 +147,7 @@ func (tl *TileList) keepSelectionVisible(viewHeight, innerWidth int) {
 func (tl *TileList) Draw(screen tcell.Screen) {
 	tl.Box.DrawForSubclass(screen, tl)
 	x, y, w, h := tl.GetInnerRect()
+	tl.lastInnerW, tl.lastInnerH = w, h
 	if w <= 0 || h <= 0 {
 		return
 	}
@@ -123,7 +162,13 @@ func (tl *TileList) Draw(screen tcell.Screen) {
 	}
 
 	// Keep selection in view given the current width/height.
-	tl.keepSelectionVisible(h, w)
+	// When auto-following the bottom on new items, skip once so the new tile
+	// remains visible while selection stays unchanged.
+	if tl.skipKeepOnce {
+		tl.skipKeepOnce = false
+	} else {
+		tl.keepSelectionVisible(h, w)
+	}
 
 	// Additional safety: if tiles got removed asynchronously between measure and draw
 	if tl.selectedIndex < 0 {
@@ -170,6 +215,46 @@ func (tl *TileList) Draw(screen tcell.Screen) {
 			}
 			for xx := startX; xx < x+w; xx++ {
 				screen.SetContent(xx, yy, ' ', nil, style)
+			}
+		}
+		if t.Highlight && w >= 2 && th >= 2 {
+			_, bg, _ := style.Decompose()
+			borderStyle := style.Foreground(tcell.ColorYellow).Background(bg)
+			top := drawY
+			bottom := drawY + th - 1
+			left := x
+			right := x + w - 1
+
+			if top >= y && top < y+h {
+				for xx := left; xx <= right; xx++ {
+					screen.SetContent(xx, top, tcell.RuneHLine, nil, borderStyle)
+				}
+			}
+			if bottom >= y && bottom < y+h {
+				for xx := left; xx <= right; xx++ {
+					screen.SetContent(xx, bottom, tcell.RuneHLine, nil, borderStyle)
+				}
+			}
+
+			startBorderY := top
+			if startBorderY < y {
+				startBorderY = y
+			}
+			endBorderY := bottom
+			if endBorderY >= y+h {
+				endBorderY = y + h - 1
+			}
+			for yy := startBorderY; yy <= endBorderY; yy++ {
+				screen.SetContent(left, yy, tcell.RuneVLine, nil, borderStyle)
+				screen.SetContent(right, yy, tcell.RuneVLine, nil, borderStyle)
+			}
+			if top >= y && top < y+h {
+				screen.SetContent(left, top, tcell.RuneULCorner, nil, borderStyle)
+				screen.SetContent(right, top, tcell.RuneURCorner, nil, borderStyle)
+			}
+			if bottom >= y && bottom < y+h {
+				screen.SetContent(left, bottom, tcell.RuneLLCorner, nil, borderStyle)
+				screen.SetContent(right, bottom, tcell.RuneLRCorner, nil, borderStyle)
 			}
 		}
 
