@@ -1,12 +1,13 @@
 # Each source can be toggled independently. At least one enabled source is required.
 stocklabs:
-  enabled: true
-  includeHistorical: true
+  enabled: true # toggle to enable/disable the stocklabs source
+  includeHistorical: true # toggle to fetch historical news in the stream when the app starts
 
 alpaca:
-  enabled: false
-  apiKeyID: ""
-  apiKeySecret: ""
+  enabled: false # toggle to enable/disable the alpaca source
+  # recommended to use a paper account credentials here, for the least privilege principle.
+  apiKeyID: "" # alpaca API key ID
+  apiKeySecret: "" # alpaca API key secret
 
 filter:
   # keywords to exclude from the news stream.
@@ -29,3 +30,5 @@ filter:
   highlightKeywords: []
     # - "strike"
     # - "ceasefire"
+
+debug: false # toggle to enable/disable printing debug logs to the log inspector panel
