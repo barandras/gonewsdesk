@@ -79,3 +79,56 @@ Then run:
 gonewsdesk
 ```
 
+## Release binaries
+
+Prebuilt binaries are published in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases) for:
+
+- Linux (`amd64`, `arm64`)
+- macOS (`amd64`, `arm64`)
+- Windows (`amd64`, `arm64`)
+
+Each release includes a `checksums.txt` file.
+
+### Verify checksums
+
+After downloading an archive and `checksums.txt`, run one of the following:
+
+macOS/Linux:
+
+```bash
+shasum -a 256 -c checksums.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+Get-FileHash .\gonewsdesk_<version>_windows_amd64.zip -Algorithm SHA256
+```
+
+Then compare the reported hash to the matching entry in `checksums.txt`.
+
+## Releasing a new version
+
+Releases are created by pushing a semantic version tag (`vX.Y.Z`). The release workflow then builds and publishes binaries to GitHub Releases automatically.
+
+1. Make sure your changes are merged to `main`.
+2. Pull latest `main` locally:
+
+```bash
+git checkout main
+git pull origin main
+```
+
+3. Create a new version tag:
+
+```bash
+git tag v0.1.0
+```
+
+4. Push the tag:
+
+```bash
+git push origin v0.1.0
+```
+
+5. Confirm the `Release` GitHub Action succeeds and assets appear in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases).
