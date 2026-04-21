@@ -1,6 +1,8 @@
 package newsdesk
 
 import (
+	"strings"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -34,7 +36,10 @@ func (t *Tile) MeasureHeight(innerWidth int) int {
 	if t.TitleSingleLine {
 		titleLines = []string{t.Title}
 	}
-	bodyLines := tview.WordWrap(t.Body, contentWidth)
+	bodyLines := []string{}
+	if strings.TrimSpace(t.Body) != "" {
+		bodyLines = tview.WordWrap(t.Body, contentWidth)
+	}
 	metaLines := 1 // shown as a single caption line
 
 	// 2 for top/bottom padding, plus the lines themselves.
@@ -291,11 +296,13 @@ func (tl *TileList) Draw(screen tcell.Screen) {
 			}
 		}
 		// Body
-		for _, l := range tview.WordWrap(t.Body, tw) {
-			if line >= y && line < y+h {
-				tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorCadetBlue)
+		if strings.TrimSpace(t.Body) != "" {
+			for _, l := range tview.WordWrap(t.Body, tw) {
+				if line >= y && line < y+h {
+					tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorCadetBlue)
+				}
+				line++
 			}
-			line++
 		}
 		// advance to next tile
 		drawY += th
