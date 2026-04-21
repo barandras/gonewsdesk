@@ -67,7 +67,14 @@ An example configuration is available in `config.example.yaml`.
 
 ## Installation
 
+If you are not sure which method to use:
+
+- use **Go CLI** if you already have Go installed and use it for other tools.
+- use a **release binary** if you just want to download and run the app quickly.
+
 ### Install with Go CLI
+
+This installs `gonewsdesk` to your Go bin directory (usually `~/go/bin`), so you can run it like a normal command.
 
 ```bash
 go install github.com/barandras/gonewsdesk@latest
@@ -83,7 +90,12 @@ gonewsdesk
 
 Prebuilt binaries are published in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases).
 
-Pick a version and architecture (`amd64` or `arm64`), then use one of the following:
+Pick a version and architecture (`amd64` or `arm64`), then use one of the following.
+
+Architecture quick guide:
+
+- `amd64`: most Intel/AMD CPUs
+- `arm64`: Apple Silicon Macs (M1/M2/M3/M4) and ARM Linux devices
 
 #### macOS
 
@@ -122,11 +134,28 @@ Expand-Archive -Path $Asset -DestinationPath .
 
 ### Configuration file requirement
 
-Before running the app, either:
+`gonewsdesk` needs a config file before it can start.
 
-- rename `config.example.yaml` to `config.yaml`, or
-- provide `--config <path>`, or
-- set `CONFIG=<path>`.
+Choose one of these options:
+
+1. Easiest: copy `config.example.yaml` to `config.yaml` in the same folder where you run `gonewsdesk`.
+2. Keep a custom filename/location and pass it explicitly with `--config <path>`.
+3. Set `CONFIG=<path>` as an environment variable (useful in scripts).
+
+Examples:
+
+```bash
+cp config.example.yaml config.yaml
+gonewsdesk
+```
+
+```bash
+gonewsdesk --config ./config.local.yaml
+```
+
+```bash
+CONFIG=./config.local.yaml gonewsdesk
+```
 
 ## Release binaries
 
