@@ -63,11 +63,11 @@ You can override the config path with:
 - `--config <path>`
 - `CONFIG=<path>` environment variable
 
-Example configuration is available in `config.yaml`.
+An example configuration is available in `config.example.yaml`.
 
 ## Installation
 
-You can run a downloaded release binary, or install from source with Go:
+### Install with Go CLI
 
 ```bash
 go install github.com/barandras/gonewsdesk@latest
@@ -79,21 +79,60 @@ Then run:
 gonewsdesk
 ```
 
+### Install from release binaries
+
+Prebuilt binaries are published in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases).
+
+Pick a version and architecture (`amd64` or `arm64`), then use one of the following:
+
+#### macOS
+
+```bash
+VERSION=v0.1.0
+ARCH=arm64
+curl -fLO "https://github.com/barandras/gonewsdesk/releases/download/${VERSION}/gonewsdesk_${VERSION#v}_darwin_${ARCH}.tar.gz"
+tar -xzf "gonewsdesk_${VERSION#v}_darwin_${ARCH}.tar.gz"
+chmod +x gonewsdesk
+sudo mv gonewsdesk /usr/local/bin/gonewsdesk
+gonewsdesk
+```
+
+#### Linux
+
+```bash
+VERSION=v0.1.0
+ARCH=amd64
+curl -fLO "https://github.com/barandras/gonewsdesk/releases/download/${VERSION}/gonewsdesk_${VERSION#v}_linux_${ARCH}.tar.gz"
+tar -xzf "gonewsdesk_${VERSION#v}_linux_${ARCH}.tar.gz"
+chmod +x gonewsdesk
+sudo mv gonewsdesk /usr/local/bin/gonewsdesk
+gonewsdesk
+```
+
+#### Windows (PowerShell)
+
+```powershell
+$Version = "v0.1.0"
+$Arch = "amd64"
+$Asset = "gonewsdesk_$($Version.TrimStart('v'))_windows_$Arch.zip"
+Invoke-WebRequest -Uri "https://github.com/barandras/gonewsdesk/releases/download/$Version/$Asset" -OutFile $Asset
+Expand-Archive -Path $Asset -DestinationPath .
+.\gonewsdesk.exe
+```
+
+### Configuration file requirement
+
+Before running the app, either:
+
+- rename `config.example.yaml` to `config.yaml`, or
+- provide `--config <path>`, or
+- set `CONFIG=<path>`.
+
 ## Release binaries
-
-Prebuilt binaries are published in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases) for:
-
-- Linux (`amd64`, `arm64`)
-- macOS (`amd64`, `arm64`)
-- Windows (`amd64`, `arm64`)
 
 Each release includes a `checksums.txt` file.
 
 ### Verify checksums
-
-After downloading an archive and `checksums.txt`, run one of the following:
-
-macOS/Linux:
 
 ```bash
 shasum -a 256 -c checksums.txt
