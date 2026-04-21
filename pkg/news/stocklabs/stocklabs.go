@@ -257,6 +257,7 @@ func externalNewsFromPayload(p stocklabsNewsPayload) (news.ExternalNews, error) 
 	if p.Text == "" && p.Link == "" {
 		return news.ExternalNews{}, fmt.Errorf("empty news item")
 	}
+	headline, body := splitHeadlineAndBody(p.Text)
 
 	var id string
 	if p.Link == "" {
@@ -286,13 +287,31 @@ func externalNewsFromPayload(p stocklabsNewsPayload) (news.ExternalNews, error) 
 
 	return news.ExternalNews{
 		ID:               id,
-		Headline:         p.Text,
+		Headline:         headline,
+		Content:          body,
 		Author:           author,
 		Source:           source,
 		Url:              p.Link,
 		SymbolsMentioned: nil,
 		Timestamp:        ts,
 	}, nil
+}
+
+func splitHeadlineAndBody(text string) (headline, body string) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "", ""
+	}
+	parts := strings.Split(text, "\n")
+	headline = strings.TrimSpace(parts[0])
+	if len(parts) == 1 {
+		return headline, ""
+	}
+	for i := 1; i < len(parts); i++ {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	body = strings.TrimSpace(strings.Join(parts[1:], "\n"))
+	return headline, body
 }
 
 func (s *StocklabsNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {

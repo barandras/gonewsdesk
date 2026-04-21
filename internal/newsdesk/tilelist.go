@@ -7,11 +7,12 @@ import (
 
 // ---- Model for one tile.
 type Tile struct {
-	Title     string // may contain [color] tags
-	Body      string // may contain [color] tags
-	Meta      string // subtitle line
-	Highlight bool   // draws a yellow border around the tile
-	OnOpen    func()
+	Title           string // may contain [color] tags
+	TitleSingleLine bool   // draw title on exactly one line
+	Body            string // may contain [color] tags
+	Meta            string // subtitle line
+	Highlight       bool   // draws a yellow border around the tile
+	OnOpen          func()
 	// cache last measured height for current width to avoid recomputing too much (optional)
 	lastWidth  int
 	lastHeight int
@@ -30,6 +31,9 @@ func (t *Tile) MeasureHeight(innerWidth int) int {
 		contentWidth = 1
 	}
 	titleLines := tview.WordWrap(t.Title, contentWidth)
+	if t.TitleSingleLine {
+		titleLines = []string{t.Title}
+	}
 	bodyLines := tview.WordWrap(t.Body, contentWidth)
 	metaLines := 1 // shown as a single caption line
 
@@ -273,16 +277,23 @@ func (tl *TileList) Draw(screen tcell.Screen) {
 		line++
 
 		// Title
-		for _, l := range tview.WordWrap(t.Title, tw) {
+		if t.TitleSingleLine {
 			if line >= y && line < y+h {
-				tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorCadetBlue)
+				tview.Print(screen, t.Title, tx, line, tw, tview.AlignLeft, tcell.ColorLightBlue)
 			}
 			line++
+		} else {
+			for _, l := range tview.WordWrap(t.Title, tw) {
+				if line >= y && line < y+h {
+					tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorLightBlue)
+				}
+				line++
+			}
 		}
 		// Body
 		for _, l := range tview.WordWrap(t.Body, tw) {
 			if line >= y && line < y+h {
-				tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorLightBlue)
+				tview.Print(screen, l, tx, line, tw, tview.AlignLeft, tcell.ColorCadetBlue)
 			}
 			line++
 		}

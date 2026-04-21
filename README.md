@@ -43,6 +43,14 @@ Filters are applied to the merged stream, regardless of source.
 
 Matching is case-insensitive and based on substring checks.
 
+## UI options
+
+- `ui.shortHeadlineOnly`: when `true`, tiles show only meta and a one-line headline (no body).
+- `ui.truncateTileBody`: when `true`, tile body text in the main list is shortened.
+- `ui.tileBodyMaxChars`: max tile body length before truncation (default: `300`).
+
+The full, original headline/body is still used by details and highlight matching.
+
 ## Controls
 
 - `F1`: open/close the logs panel
@@ -66,11 +74,6 @@ You can override the config path with:
 An example configuration is available in `config.example.yaml`.
 
 ## Installation
-
-If you are not sure which method to use:
-
-- use **Go CLI** if you already have Go installed and use it for other tools.
-- use a **release binary** if you just want to download and run the app quickly.
 
 ### Install with Go CLI
 

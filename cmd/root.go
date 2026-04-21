@@ -125,6 +125,9 @@ func runApp() error {
 		Ctx:               ctx,
 		NewsProcessor:     np,
 		HighlightKeywords: highlightKeywordsFromConfig(),
+		TruncateTileBody:  truncateTileBodyEnabledFromConfig(),
+		TileBodyMaxChars:  tileBodyMaxCharsFromConfig(),
+		ShortHeadlineOnly: shortHeadlineOnlyFromConfig(),
 		OnShutdown:        stop,
 		Debug:             debug,
 	})
@@ -182,4 +185,32 @@ func highlightKeywordsFromConfig() []string {
 		return nil
 	}
 	return f.GetStringSlice("highlightKeywords")
+}
+
+func truncateTileBodyEnabledFromConfig() bool {
+	ui := viper.Sub("ui")
+	if ui == nil {
+		return false
+	}
+	return ui.GetBool("truncateTileBody")
+}
+
+func tileBodyMaxCharsFromConfig() int {
+	ui := viper.Sub("ui")
+	if ui == nil {
+		return newsdesk.DefaultTileBodyMaxChars
+	}
+	maxChars := ui.GetInt("tileBodyMaxChars")
+	if maxChars <= 0 {
+		return newsdesk.DefaultTileBodyMaxChars
+	}
+	return maxChars
+}
+
+func shortHeadlineOnlyFromConfig() bool {
+	ui := viper.Sub("ui")
+	if ui == nil {
+		return false
+	}
+	return ui.GetBool("shortHeadlineOnly")
 }

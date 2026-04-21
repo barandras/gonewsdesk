@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	regionalIndicatorA = rune(0x1F1E6)
-	regionalIndicatorZ = rune(0x1F1FF)
+	regionalIndicatorA      = rune(0x1F1E6)
+	regionalIndicatorZ      = rune(0x1F1FF)
+	DefaultTileBodyMaxChars = 300
 )
 
 type NewsDesk struct {
@@ -22,6 +23,9 @@ type NewsDesk struct {
 	NewsProcessor     *news.NewsProcessor
 	app               *tview.Application
 	highlightKeywords []string
+	truncateTileBody  bool
+	tileBodyMaxChars  int
+	shortHeadlineOnly bool
 	onShutdown        func()
 	debug             bool
 }
@@ -32,6 +36,12 @@ type NewNewsDeskParams struct {
 	NewsProcessor *news.NewsProcessor
 	// HighlightKeywords: headlines matching any keyword get a yellow tile border.
 	HighlightKeywords []string
+	// TruncateTileBody: if true, tile body text is shortened for display only.
+	TruncateTileBody bool
+	// TileBodyMaxChars: maximum tile body chars before truncation.
+	TileBodyMaxChars int
+	// ShortHeadlineOnly: if true, tiles render meta + one-line headline only.
+	ShortHeadlineOnly bool
 	// OnShutdown is invoked when the user quits the UI (e.g. cancel the root context). Optional but recommended.
 	OnShutdown func()
 	// Debug: enable debug mode
@@ -39,10 +49,17 @@ type NewNewsDeskParams struct {
 }
 
 func NewNewsDesk(params NewNewsDeskParams) *NewsDesk {
+	maxChars := params.TileBodyMaxChars
+	if maxChars <= 0 {
+		maxChars = DefaultTileBodyMaxChars
+	}
 	return &NewsDesk{
 		ctx:               params.Ctx,
 		NewsProcessor:     params.NewsProcessor,
 		highlightKeywords: append([]string(nil), params.HighlightKeywords...),
+		truncateTileBody:  params.TruncateTileBody,
+		tileBodyMaxChars:  maxChars,
+		shortHeadlineOnly: params.ShortHeadlineOnly,
 		onShutdown:        params.OnShutdown,
 		debug:             params.Debug,
 	}
@@ -126,11 +143,18 @@ func (d *NewsDesk) Run() error {
 		log.Println("Debug mode enabled")
 	}
 	d.RunNewsStream(func(item news.ExternalNews) {
+		fullBody := externalNewsBody(item)
 		tile := NewsTileFromExternal(item)
+		if d.shortHeadlineOnly {
+			tile.Title = firstLine(tile.Title)
+			tile.TitleSingleLine = true
+			tile.Body = ""
+		} else if d.truncateTileBody {
+			tile.Body = truncateForTile(fullBody, d.tileBodyMaxChars)
+		}
 		tile.Highlight = headlineShouldHighlight(item.Headline, d.highlightKeywords)
-		body := tile.Body
 		tile.OnOpen = func() {
-			showNewsModal(item, body)
+			showNewsModal(item, fullBody)
 		}
 		tiles.AddTile(tile)
 	})
@@ -211,10 +235,7 @@ func (d *NewsDesk) Run() error {
 
 // NewsTileFromExternal maps a merged news item to a scrollable tile.
 func NewsTileFromExternal(n news.ExternalNews) Tile {
-	body := strings.TrimSpace(sanitizeCountryFlags(n.Summary))
-	if body == "" {
-		body = strings.TrimSpace(sanitizeCountryFlags(n.Content))
-	}
+	body := externalNewsBody(n)
 	meta := sanitizeCountryFlags(n.Source)
 	if !n.Timestamp.IsZero() {
 		if meta != "" {
@@ -241,6 +262,14 @@ func NewsTileFromExternal(n news.ExternalNews) Tile {
 		Meta:   meta,
 		OnOpen: onOpen,
 	}
+}
+
+func externalNewsBody(n news.ExternalNews) string {
+	body := strings.TrimSpace(sanitizeCountryFlags(n.Summary))
+	if body == "" {
+		body = strings.TrimSpace(sanitizeCountryFlags(n.Content))
+	}
+	return body
 }
 
 // RunNewsStream reads the processor merged channel and invokes handler on the
@@ -349,6 +378,27 @@ func sanitizeCountryFlags(text string) string {
 	}
 
 	return b.String()
+}
+
+func truncateForTile(text string, maxChars int) string {
+	if maxChars <= 0 {
+		return text
+	}
+	runes := []rune(text)
+	if len(runes) <= maxChars {
+		return text
+	}
+	if maxChars <= 1 {
+		return "…"
+	}
+	return string(runes[:maxChars-1]) + "…"
+}
+
+func firstLine(text string) string {
+	if i := strings.IndexByte(text, '\n'); i >= 0 {
+		text = text[:i]
+	}
+	return strings.TrimRight(text, "\r")
 }
 
 func isRegionalIndicator(r rune) bool {

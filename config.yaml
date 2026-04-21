@@ -32,3 +32,11 @@ filter:
     # - "ceasefire"
 
 debug: false # toggle to enable/disable printing debug logs to the log inspector panel
+
+ui:
+  # if true, tiles show only meta and a single-line headline (no body)
+  shortHeadlineOnly: false
+  # if true, tile bodies are shortened in the list only; details modal keeps full text
+  truncateTileBody: false
+  # maximum tile body chars before truncation (used when truncateTileBody is true)
+  tileBodyMaxChars: 300
