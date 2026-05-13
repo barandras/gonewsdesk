@@ -151,8 +151,9 @@ func buildNewsProviders(ctx context.Context, debug bool) ([]news.NewsProvider, e
 		sec := strings.TrimSpace(alp.GetString("apiKeySecret"))
 		if id != "" && sec != "" {
 			p := alpaca.NewAlpacaNewsProvider(alpaca.NewAlpacaNewsProviderParams{
-				Ctx:   ctx,
-				Debug: debug,
+				Ctx:               ctx,
+				Debug:             debug,
+				IncludeHistorical: alp.GetBool("includeHistorical"),
 				AlpacaCredentials: alpaca.AlpacaCredentials{
 					APIKeyID:     id,
 					APIKeySecret: sec,

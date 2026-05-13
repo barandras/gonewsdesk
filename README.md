@@ -10,28 +10,35 @@ GoNewsDesk is a terminal news desk for traders. It merges real-time market news 
 - Filter headlines with include/exclude keyword lists
 - Highlight important headlines using keyword matches
 - Open a detailed modal view for each news item
-- Toggle an in-app log panel for debugging and monitoring
 
 ## News sources
 
 ### Stocklabs
 
-Stocklabs provides a stream of market-related posts (primarily from X-focused news profiles). In GoNewsDesk, this source can be enabled independently and optionally backfilled with recent historical items at startup.
+[Stocklabs](https://stocklabs.com/) provides a stream of market-related posts (primarily from X-focused news profiles). In GoNewsDesk, this source can be enabled independently and optionally backfilled with recent historical items at startup.
 
 - Config key: `stocklabs.enabled`
 - Historical backfill key: `stocklabs.includeHistorical`
+
+If the `includeHistorical` is `false`, only the news will appear that are published after the app starts. If it's `true`, the app will fetch the latest news articles from Stocklabs and publish them to the merged feed oldest-first.
 
 However you don't need to use this app to see the news from Stocklabs, you can just visit their news page https://stocklabs.com/news and see the news there.
 
 ### Alpaca
 
-Alpaca provides a real-time news WebSocket feed (configured in this project via API keys) from Benzinga. This source is optional and only starts when all of the following are true:
+[Alpaca](https://alpaca.markets/) provides a real-time news WebSocket feed from Benzinga. You need to have an Alpaca account to get the API keys. However the account doesn't have to be live, simply registering and creating a paper account is enough, don't even have to go through the KYC process. Although, even if you have a live account, it's recommended to use a paper account credentials for the least privilege principle.
+
+This source is optional and only starts when all of the following are true:
 
 - `alpaca.enabled` is `true`
 - `alpaca.apiKeyID` is set
 - `alpaca.apiKeySecret` is set
 
-Alpaca is stream-only in this app (no historical backfill in the current implementation).
+Optional startup backfill:
+
+- Historical backfill key: `alpaca.includeHistorical`
+
+If the `includeHistorical` is `false`, only the news will appear that are published after the app starts. If it's `true`, the app will fetch the latest 20 news articles from Alpaca and publish them to the merged feed oldest-first.
 
 ## Filters
 

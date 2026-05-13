@@ -5,6 +5,9 @@ stocklabs:
 
 alpaca:
   enabled: false # toggle to enable/disable the alpaca source
+  # when enabled, fetches the latest 20 articles from Alpaca's REST news API at startup (before the live WebSocket stream).
+  # see https://docs.alpaca.markets/us/reference/news-3
+  includeHistorical: true
   # recommended to use a paper account credentials here, for the least privilege principle.
   apiKeyID: "" # alpaca API key ID
   apiKeySecret: "" # alpaca API key secret

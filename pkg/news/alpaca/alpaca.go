@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -15,7 +17,10 @@ import (
 )
 
 const (
-	alpacaNewsStreamURL = "wss://stream.data.alpaca.markets/v1beta1/news"
+	alpacaNewsStreamURL     = "wss://stream.data.alpaca.markets/v1beta1/news"
+	alpacaHistoricalNewsURL = "https://data.alpaca.markets/v1beta1/news"
+
+	historicalNewsLimit = 20
 
 	initialBackoff = time.Second
 	maxBackoff     = 30 * time.Second
@@ -31,12 +36,16 @@ type AlpacaNewsProvider struct {
 	alpacaCredentials AlpacaCredentials
 	newsChannel       chan news.ExternalNews
 	debug             bool
+	includeHistorical bool
+	historicalFetched bool
+	seenNewsIDs       map[string]struct{}
 }
 
 type NewAlpacaNewsProviderParams struct {
 	Ctx               context.Context
 	AlpacaCredentials AlpacaCredentials
 	Debug             bool
+	IncludeHistorical bool
 }
 
 func NewAlpacaNewsProvider(params NewAlpacaNewsProviderParams) *AlpacaNewsProvider {
@@ -45,6 +54,8 @@ func NewAlpacaNewsProvider(params NewAlpacaNewsProviderParams) *AlpacaNewsProvid
 		alpacaCredentials: params.AlpacaCredentials,
 		newsChannel:       make(chan news.ExternalNews, 256),
 		debug:             params.Debug,
+		includeHistorical: params.IncludeHistorical,
+		seenNewsIDs:       make(map[string]struct{}),
 	}
 	go a.run()
 	return a
@@ -104,6 +115,14 @@ func (a *AlpacaNewsProvider) connectOnce() error {
 	}
 	log.Printf("websocket connected to %s", alpacaNewsStreamURL)
 	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	if a.includeHistorical && !a.historicalFetched {
+		if err := a.fetchHistoricalAndPublish(a.ctx); err != nil {
+			log.Printf("alpaca news historical backfill failed: %v", err)
+		} else {
+			a.historicalFetched = true
+		}
+	}
 
 	if err := a.handshakeAndSubscribe(a.ctx, conn); err != nil {
 		return err
@@ -182,15 +201,78 @@ func (a *AlpacaNewsProvider) readLoop(ctx context.Context, conn *websocket.Conn)
 					log.Printf("alpaca news: drop item: %v", err)
 					continue
 				}
-				select {
-				case <-ctx.Done():
+				if !a.pushNews(ctx, ext) {
 					return ctx.Err()
-				case a.newsChannel <- ext:
 				}
 			default:
 				continue
 			}
 		}
+	}
+}
+
+func (a *AlpacaNewsProvider) fetchHistoricalAndPublish(ctx context.Context) error {
+	q := url.Values{}
+	q.Set("limit", strconv.Itoa(historicalNewsLimit))
+	q.Set("sort", "desc")
+
+	reqURL := alpacaHistoricalNewsURL + "?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return fmt.Errorf("build historical request: %w", err)
+	}
+	req.Header.Set("APCA-API-KEY-ID", a.alpacaCredentials.APIKeyID)
+	req.Header.Set("APCA-API-SECRET-KEY", a.alpacaCredentials.APIKeySecret)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request historical news: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("historical news request failed with status %s: %s", resp.Status, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read historical response body: %w", err)
+	}
+
+	var parsed struct {
+		News []json.RawMessage `json:"news"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return fmt.Errorf("decode historical response: %w", err)
+	}
+
+	// API returns newest first; publish oldest->newest for a natural stream.
+	for i := len(parsed.News) - 1; i >= 0; i-- {
+		ext, err := externalNewsFromAlpacaJSON(parsed.News[i])
+		if err != nil {
+			a.debugLogf("skip historical item: %v", err)
+			continue
+		}
+		if !a.pushNews(ctx, ext) {
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+func (a *AlpacaNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {
+	if ext.ID != "" {
+		if _, seen := a.seenNewsIDs[ext.ID]; seen {
+			return true
+		}
+		a.seenNewsIDs[ext.ID] = struct{}{}
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case a.newsChannel <- ext:
+		return true
 	}
 }
 
