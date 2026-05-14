@@ -55,8 +55,9 @@ Matching is case-insensitive and based on substring checks.
 - `ui.shortHeadlineOnly`: when `true`, tiles show only meta and a one-line headline (no body).
 - `ui.truncateTileBody`: when `true`, tile body text in the main list is shortened.
 - `ui.tileBodyMaxChars`: max tile body length before truncation (default: `300`).
+- `flag-compat` (or `--flag-compat`): when `true`, regional-indicator flag emoji in displayed text are replaced with an ASCII-friendly tag (neutral flag plus two-letter code). Default is `false`, which keeps the original Unicode flags—useful for modern terminals that render them correctly.
 
-The full, original headline/body is still used by details and highlight matching.
+The full, original headline/body is still used for highlight matching (raw headline from the feed). Optional `flag-compat` only changes how flag emoji are shown in the UI text.
 
 ## Controls
 
@@ -77,6 +78,10 @@ You can override the config path with:
 
 - `--config <path>`
 - `CONFIG=<path>` environment variable
+
+Other useful flags:
+
+- `--flag-compat`: same as `flag-compat` in the config file (see [UI options](#ui-options)).
 
 An example configuration is available in `config.example.yaml`.
 

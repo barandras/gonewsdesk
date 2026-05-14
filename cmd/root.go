@@ -73,6 +73,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml)")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "enable debug mode")
+	rootCmd.PersistentFlags().Bool("flag-compat", false, "replace regional-indicator flag emoji with ASCII tags for terminals that mis-render them")
 
 	viper.BindPFlags(rootCmd.Flags())
 	viper.BindPFlags(rootCmd.PersistentFlags())
@@ -128,6 +129,7 @@ func runApp() error {
 		TruncateTileBody:  truncateTileBodyEnabledFromConfig(),
 		TileBodyMaxChars:  tileBodyMaxCharsFromConfig(),
 		ShortHeadlineOnly: shortHeadlineOnlyFromConfig(),
+		FlagCompat:        viper.GetBool("flag-compat"),
 		OnShutdown:        stop,
 		Debug:             debug,
 	})

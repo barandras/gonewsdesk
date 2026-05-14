@@ -26,6 +26,7 @@ type NewsDesk struct {
 	truncateTileBody  bool
 	tileBodyMaxChars  int
 	shortHeadlineOnly bool
+	flagCompat        bool
 	onShutdown        func()
 	debug             bool
 }
@@ -42,6 +43,8 @@ type NewNewsDeskParams struct {
 	TileBodyMaxChars int
 	// ShortHeadlineOnly: if true, tiles render meta + one-line headline only.
 	ShortHeadlineOnly bool
+	// FlagCompat: if true, replace regional-indicator flag emoji with ASCII tags for terminals that mis-render them.
+	FlagCompat bool
 	// OnShutdown is invoked when the user quits the UI (e.g. cancel the root context). Optional but recommended.
 	OnShutdown func()
 	// Debug: enable debug mode
@@ -60,6 +63,7 @@ func NewNewsDesk(params NewNewsDeskParams) *NewsDesk {
 		truncateTileBody:  params.TruncateTileBody,
 		tileBodyMaxChars:  maxChars,
 		shortHeadlineOnly: params.ShortHeadlineOnly,
+		flagCompat:        params.FlagCompat,
 		onShutdown:        params.OnShutdown,
 		debug:             params.Debug,
 	}
@@ -111,7 +115,7 @@ func (d *NewsDesk) Run() error {
 			SetScrollable(true).
 			SetWrap(true).
 			SetDynamicColors(true).
-			SetText(newsDetailsText(item, body))
+			SetText(newsDetailsText(d.flagCompat, item, body))
 		textView.SetBorder(true).SetTitle(" News Details · [yellow][Esc[] [cadetblue]or [yellow][Enter[] [cadetblue]close[white] ")
 
 		modal := tview.NewFlex().
@@ -143,8 +147,8 @@ func (d *NewsDesk) Run() error {
 		log.Println("Debug mode enabled")
 	}
 	d.RunNewsStream(func(item news.ExternalNews) {
-		fullBody := externalNewsBody(item)
-		tile := NewsTileFromExternal(item)
+		fullBody := externalNewsBody(d.flagCompat, item)
+		tile := NewsTileFromExternal(d.flagCompat, item)
 		if d.shortHeadlineOnly {
 			tile.Title = firstLine(tile.Title)
 			tile.TitleSingleLine = true
@@ -247,9 +251,9 @@ func (d *NewsDesk) Run() error {
 }
 
 // NewsTileFromExternal maps a merged news item to a scrollable tile.
-func NewsTileFromExternal(n news.ExternalNews) Tile {
-	body := externalNewsBody(n)
-	meta := sanitizeCountryFlags(n.Source)
+func NewsTileFromExternal(flagCompat bool, n news.ExternalNews) Tile {
+	body := externalNewsBody(flagCompat, n)
+	meta := maybeSanitizeCountryFlags(flagCompat, n.Source)
 	if !n.Timestamp.IsZero() {
 		if meta != "" {
 			meta += " · "
@@ -260,27 +264,27 @@ func NewsTileFromExternal(n news.ExternalNews) Tile {
 		if meta != "" {
 			meta += " · "
 		}
-		meta += sanitizeCountryFlags(n.Author)
+		meta += maybeSanitizeCountryFlags(flagCompat, n.Author)
 	}
 	if len(n.SymbolsMentioned) > 0 {
 		if meta != "" {
 			meta += " · "
 		}
-		meta += sanitizeCountryFlags(strings.Join(n.SymbolsMentioned, ", "))
+		meta += maybeSanitizeCountryFlags(flagCompat, strings.Join(n.SymbolsMentioned, ", "))
 	}
 	var onOpen func()
 	return Tile{
-		Title:  sanitizeCountryFlags(n.Headline),
+		Title:  maybeSanitizeCountryFlags(flagCompat, n.Headline),
 		Body:   body,
 		Meta:   meta,
 		OnOpen: onOpen,
 	}
 }
 
-func externalNewsBody(n news.ExternalNews) string {
-	body := strings.TrimSpace(sanitizeCountryFlags(n.Summary))
+func externalNewsBody(flagCompat bool, n news.ExternalNews) string {
+	body := strings.TrimSpace(maybeSanitizeCountryFlags(flagCompat, n.Summary))
 	if body == "" {
-		body = strings.TrimSpace(sanitizeCountryFlags(n.Content))
+		body = strings.TrimSpace(maybeSanitizeCountryFlags(flagCompat, n.Content))
 	}
 	return body
 }
@@ -320,7 +324,7 @@ func (d *NewsDesk) RunNewsStreamTiles(list *TileList) {
 		return
 	}
 	d.RunNewsStream(func(item news.ExternalNews) {
-		list.AddTile(NewsTileFromExternal(item))
+		list.AddTile(NewsTileFromExternal(d.flagCompat, item))
 	})
 }
 
@@ -346,7 +350,7 @@ func headlineShouldHighlight(headline string, highlight []string) bool {
 	return false
 }
 
-func newsDetailsText(item news.ExternalNews, body string) string {
+func newsDetailsText(flagCompat bool, item news.ExternalNews, body string) string {
 	timestamp := ""
 	if !item.Timestamp.IsZero() {
 		timestamp = item.Timestamp.Local().Format(time.RFC3339)
@@ -355,16 +359,23 @@ func newsDetailsText(item news.ExternalNews, body string) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "[green]ID[-]: %s\n", tview.Escape(item.ID))
-	fmt.Fprintf(&b, "[green]Headline[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Headline)))
-	fmt.Fprintf(&b, "[green]Source[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Source)))
-	fmt.Fprintf(&b, "[green]Author[-]: %s\n", tview.Escape(sanitizeCountryFlags(item.Author)))
+	fmt.Fprintf(&b, "[green]Headline[-]: %s\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, item.Headline)))
+	fmt.Fprintf(&b, "[green]Source[-]: %s\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, item.Source)))
+	fmt.Fprintf(&b, "[green]Author[-]: %s\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, item.Author)))
 	fmt.Fprintf(&b, "[green]Timestamp[-]: %s\n", tview.Escape(timestamp))
 	fmt.Fprintf(&b, "[green]URL[-]: %s\n", tview.Escape(item.Url))
-	fmt.Fprintf(&b, "[green]Symbols[-]: %s\n\n", tview.Escape(sanitizeCountryFlags(symbols)))
-	fmt.Fprintf(&b, "[green]Body[-]:\n%s\n\n", tview.Escape(sanitizeCountryFlags(body)))
-	fmt.Fprintf(&b, "[green]Summary[-]:\n%s\n\n", tview.Escape(sanitizeCountryFlags(item.Summary)))
-	fmt.Fprintf(&b, "[green]Content[-]:\n%s\n", tview.Escape(sanitizeCountryFlags(item.Content)))
+	fmt.Fprintf(&b, "[green]Symbols[-]: %s\n\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, symbols)))
+	fmt.Fprintf(&b, "[green]Body[-]:\n%s\n\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, body)))
+	fmt.Fprintf(&b, "[green]Summary[-]:\n%s\n\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, item.Summary)))
+	fmt.Fprintf(&b, "[green]Content[-]:\n%s\n", tview.Escape(maybeSanitizeCountryFlags(flagCompat, item.Content)))
 	return b.String()
+}
+
+func maybeSanitizeCountryFlags(flagCompat bool, text string) string {
+	if !flagCompat {
+		return text
+	}
+	return sanitizeCountryFlags(text)
 }
 
 func sanitizeCountryFlags(text string) string {

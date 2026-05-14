@@ -36,6 +36,11 @@ filter:
 
 debug: false # toggle to enable/disable printing debug logs to the log inspector panel
 
+# When true, regional-indicator flag emoji (two-letter country codes as Unicode flags) are shown as
+# a neutral flag plus ASCII letters (e.g. [🏳 US]) so terminals/fonts that break on flag sequences still render cleanly.
+# Default is false: keep the original Unicode flag emoji from the feed.
+flag-compat: false
+
 ui:
   # if true, tiles show only meta and a single-line headline (no body)
   shortHeadlineOnly: false
