@@ -2,6 +2,7 @@ package newsdesk
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -60,6 +61,40 @@ func newLogBox(ctx context.Context) *LogBox {
 		ColoringCondition{Keyword: "info", TextColor: colorPtr(tcell.ColorBlue), ApplyTo: ColoringApplyToCell},
 		ColoringCondition{Keyword: "debug", TextColor: colorPtr(tcell.ColorGray), ApplyTo: ColoringApplyToCell},
 	)
+	logBox.DataTable.SetCustomModalBuilder(func(row []string) *tview.Flex {
+		labels := []string{"Date", "Time", "File", "Line", "Message"}
+		maxLabel := 0
+		for _, label := range labels {
+			if len(label) > maxLabel {
+				maxLabel = len(label)
+			}
+		}
+
+		var b strings.Builder
+		for i, label := range labels {
+			value := ""
+			if i < len(row) {
+				value = row[i]
+			}
+			fmt.Fprintf(&b, "[green]%-*s[-]: %s\n", maxLabel, label, value)
+		}
+
+		textView := tview.NewTextView().
+			SetScrollable(true).
+			SetWrap(true).
+			SetDynamicColors(true).
+			SetText(b.String())
+		textView.SetBorder(true).SetTitle(" Details ")
+
+		// Slightly smaller than the logbox modal.
+		return tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(textView, 0, 2, true).
+				AddItem(nil, 0, 1, false), 0, 2, true).
+			AddItem(nil, 0, 1, false)
+	})
 
 	logBox.TableView = tview.NewTable().
 		SetContent(logBox.DataTable).
@@ -67,10 +102,8 @@ func newLogBox(ctx context.Context) *LogBox {
 		SetSelectable(true, false).
 		SetSelectedStyle(tcell.StyleDefault.Background(tcell.ColorDarkGray).Foreground(tcell.ColorWhite))
 
-	// Connect the table reference to the DataTable
+	// Connect the table reference to the DataTable (wires Enter on a row to open details modal).
 	logBox.DataTable.SetTable(logBox.TableView)
-	// Disable Enter-to-open-details only for logbox rows.
-	logBox.TableView.SetSelectedFunc(nil)
 
 	// Wrap log table in a box with border and title
 	logBox.FlexBox = tview.NewFlex().

@@ -162,6 +162,12 @@ func (d *NewsDesk) Run() error {
 	logBox.DataTable.SetApp(app)
 	logBox.DataTable.SetReturnRoot(pages)
 
+	// Same page ID scheme as DataTable.openDetailsModal (modal-dt-%p of the table pointer).
+	logDetailsPageID := fmt.Sprintf("modal-dt-%p", logBox.TableView)
+	isLogDetailsOpen := func() bool {
+		return pages.HasPage(logDetailsPageID)
+	}
+
 	const logModalPageID = "modal-logbox"
 	var modalPreviousFocus tview.Primitive
 	showLogModal := func() {
@@ -212,11 +218,18 @@ func (d *NewsDesk) Run() error {
 	app.SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
 		switch ev.Key() {
 		case tcell.KeyF1:
+			// Let log-line details modal handle keys first (see example/desk.go).
+			if isLogDetailsOpen() {
+				return nil
+			}
 			if !hideLogModal() {
 				showLogModal()
 			}
 			return nil
 		case tcell.KeyEscape:
+			if isLogDetailsOpen() {
+				return ev
+			}
 			if hideLogModal() {
 				return nil
 			}

@@ -378,7 +378,7 @@ func (t *DataTable) openDetailsModal(dataRow int) {
 
 	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
-		case tcell.KeyEscape:
+		case tcell.KeyEscape, tcell.KeyEnter:
 			if pages, ok := t.returnRoot.(*tview.Pages); ok {
 				pages.RemovePage(pageID)
 				t.app.SetFocus(currentFocus)
