@@ -33,6 +33,7 @@ import (
 	"github.com/barandras/gonewsdesk/internal/newsdesk"
 	"github.com/barandras/gonewsdesk/pkg/news"
 	"github.com/barandras/gonewsdesk/pkg/news/alpaca"
+	"github.com/barandras/gonewsdesk/pkg/news/custom"
 	"github.com/barandras/gonewsdesk/pkg/news/stocklabs"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -148,6 +149,23 @@ func buildNewsProviders(ctx context.Context, debug bool) ([]news.NewsProvider, e
 		providers = append(providers, p)
 	}
 
+	if cust := viper.Sub("custom"); cust != nil && cust.GetBool("enabled") {
+		url := strings.TrimSpace(cust.GetString("url"))
+		if url != "" {
+			p, err := custom.NewCustomNewsProvider(custom.NewCustomNewsProviderParams{
+				Ctx:   ctx,
+				URL:   url,
+				Debug: debug,
+			})
+			if err != nil {
+				return nil, err
+			}
+			providers = append(providers, p)
+		} else {
+			log.Printf("custom is enabled in config but url is empty; skipping custom")
+		}
+	}
+
 	if alp := viper.Sub("alpaca"); alp != nil && alp.GetBool("enabled") {
 		id := strings.TrimSpace(alp.GetString("apiKeyID"))
 		sec := strings.TrimSpace(alp.GetString("apiKeySecret"))
@@ -168,7 +186,7 @@ func buildNewsProviders(ctx context.Context, debug bool) ([]news.NewsProvider, e
 	}
 
 	if len(providers) == 0 {
-		return nil, fmt.Errorf("no news sources to run: enable stocklabs and/or alpaca (with keys) in config")
+		return nil, fmt.Errorf("no news sources to run: enable stocklabs, custom, and/or alpaca in config")
 	}
 	return providers, nil
 }

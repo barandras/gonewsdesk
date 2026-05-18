@@ -40,6 +40,17 @@ Optional startup backfill:
 
 If the `includeHistorical` is `false`, only the news will appear that are published after the app starts. If it's `true`, the app will fetch the latest 20 news articles from Alpaca and publish them to the merged feed oldest-first.
 
+### Custom
+
+The custom source connects to a WebSocket server that streams JSON news objects. It is intended for a self-hosted or third-party pipeline that publishes enriched market news over WebSocket. There is no historical backfill: only items received after the connection is established are shown.
+
+This source is optional and only starts when all of the following are true:
+
+- `custom.enabled` is `true`
+- `custom.url` is set (for example `ws://127.0.0.1:8765/ws`)
+
+Each incoming text frame must be a single JSON object with fields such as `id`, `headline`, `content`, `summary`, `source`, `url`, `symbolsMentioned`, and `ts` (RFC3339 timestamp). An optional numeric `significanceScore` (0–5) may be included when the stream provides it; other sources can omit this field.
+
 ## Filters
 
 Filters are applied to the merged stream, regardless of source.

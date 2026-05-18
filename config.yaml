@@ -1,4 +1,9 @@
 # Each source can be toggled independently. At least one enabled source is required.
+custom:
+  enabled: false # toggle to enable/disable the custom websocket news stream
+  # WebSocket URL of a server that pushes JSON news objects (one per text frame).
+  url: "ws://127.0.0.1:8765/ws"
+
 stocklabs:
   enabled: true # toggle to enable/disable the stocklabs source
   includeHistorical: true # toggle to fetch historical news in the stream when the app starts

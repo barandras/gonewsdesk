@@ -16,15 +16,16 @@ type NewsProvider interface {
 }
 
 type ExternalNews struct {
-	ID               string    `bson:"id"`
-	Headline         string    `bson:"headline"`
-	Content          string    `bson:"content"`
-	Summary          string    `bson:"summary"`
-	Author           string    `bson:"author"`
-	Source           string    `bson:"source"`
-	Url              string    `bson:"url"`
-	SymbolsMentioned []string  `bson:"symbolsMentioned"`
-	Timestamp        time.Time `bson:"ts"`
+	ID                string    `bson:"id" json:"id"`
+	Headline          string    `bson:"headline" json:"headline"`
+	Content           string    `bson:"content" json:"content"`
+	Summary           string    `bson:"summary" json:"summary"`
+	Author            string    `bson:"author" json:"author"`
+	Source            string    `bson:"source" json:"source"`
+	Url               string    `bson:"url" json:"url"`
+	SymbolsMentioned  []string  `bson:"symbolsMentioned" json:"symbolsMentioned"`
+	Timestamp         time.Time `bson:"ts" json:"ts"`
+	SignificanceScore *uint     `bson:"significanceScore,omitempty" json:"significanceScore,omitempty"`
 }
 
 type NewsProcessor struct {
