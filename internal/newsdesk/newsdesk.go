@@ -272,12 +272,36 @@ func NewsTileFromExternal(flagCompat bool, n news.ExternalNews) Tile {
 		}
 		meta += maybeSanitizeCountryFlags(flagCompat, strings.Join(n.SymbolsMentioned, ", "))
 	}
+	if prefix := significanceScoreMetaPrefix(n.SignificanceScore); prefix != "" {
+		if meta != "" {
+			meta = prefix + " · " + meta
+		} else {
+			meta = prefix
+		}
+	}
 	var onOpen func()
 	return Tile{
 		Title:  maybeSanitizeCountryFlags(flagCompat, n.Headline),
 		Body:   body,
 		Meta:   meta,
 		OnOpen: onOpen,
+	}
+}
+
+// significanceScoreMetaPrefix returns an optional leading [score] for the tile meta/header line.
+// Score 5 uses a bright red background, 4 uses yellow; other scores use the default background.
+func significanceScoreMetaPrefix(score *uint) string {
+	if score == nil {
+		return ""
+	}
+	bracketed := tview.Escape(fmt.Sprintf("[%d]", *score))
+	switch *score {
+	case 5:
+		return "[:#ff3333]" + bracketed + "[:-]"
+	case 4:
+		return "[:yellow]" + bracketed + "[:-]"
+	default:
+		return bracketed
 	}
 }
 
