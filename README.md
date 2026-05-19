@@ -126,7 +126,7 @@ Architecture quick guide:
 #### macOS
 
 ```bash
-VERSION=v0.2.0
+VERSION=v0.3.0
 ARCH=arm64
 curl -fLO "https://github.com/barandras/gonewsdesk/releases/download/${VERSION}/gonewsdesk_${VERSION#v}_darwin_${ARCH}.tar.gz"
 tar -xzf "gonewsdesk_${VERSION#v}_darwin_${ARCH}.tar.gz"
@@ -138,7 +138,7 @@ gonewsdesk
 #### Linux
 
 ```bash
-VERSION=v0.2.0
+VERSION=v0.3.0
 ARCH=amd64
 curl -fLO "https://github.com/barandras/gonewsdesk/releases/download/${VERSION}/gonewsdesk_${VERSION#v}_linux_${ARCH}.tar.gz"
 tar -xzf "gonewsdesk_${VERSION#v}_linux_${ARCH}.tar.gz"
@@ -150,7 +150,7 @@ gonewsdesk
 #### Windows (PowerShell)
 
 ```powershell
-$Version = "v0.2.0"
+$Version = "v0.3.0"
 $Arch = "amd64"
 $Asset = "gonewsdesk_$($Version.TrimStart('v'))_windows_$Arch.zip"
 Invoke-WebRequest -Uri "https://github.com/barandras/gonewsdesk/releases/download/$Version/$Asset" -OutFile $Asset
@@ -216,13 +216,13 @@ git pull origin main
 3. Create a new version tag:
 
 ```bash
-git tag v0.2.0
+git tag v0.3.0
 ```
 
 4. Push the tag:
 
 ```bash
-git push origin v0.2.0
+git push origin v0.3.0
 ```
 
 5. Confirm the `Release` GitHub Action succeeds and assets appear in [GitHub Releases](https://github.com/barandras/gonewsdesk/releases).
