@@ -22,7 +22,7 @@ const (
 	stocklabsHistoricalNewsURL = "https://api.stocklabs.com/news"
 
 	initialBackoff = time.Second
-	maxBackoff     = 30 * time.Second
+	maxBackoff     = 10 * time.Second
 
 	pingResponseJSON = `{"t":"ping","d":{}}`
 )
@@ -33,7 +33,6 @@ type StocklabsNewsProvider struct {
 	debug             bool
 	includeHistorical bool
 	historicalFetched bool
-	seenNewsIDs       map[string]struct{}
 }
 
 type NewStocklabsNewsProviderParams struct {
@@ -48,7 +47,6 @@ func NewStocklabsNewsProvider(params NewStocklabsNewsProviderParams) *StocklabsN
 		newsChannel:       make(chan news.ExternalNews, 256),
 		debug:             params.Debug,
 		includeHistorical: params.IncludeHistorical,
-		seenNewsIDs:       make(map[string]struct{}),
 	}
 	go s.run()
 	return s
@@ -315,12 +313,6 @@ func splitHeadlineAndBody(text string) (headline, body string) {
 }
 
 func (s *StocklabsNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {
-	if ext.ID != "" {
-		if _, seen := s.seenNewsIDs[ext.ID]; seen {
-			return true
-		}
-		s.seenNewsIDs[ext.ID] = struct{}{}
-	}
 	select {
 	case <-ctx.Done():
 		return false

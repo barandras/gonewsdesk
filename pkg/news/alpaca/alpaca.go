@@ -23,7 +23,7 @@ const (
 	historicalNewsLimit = 20
 
 	initialBackoff = time.Second
-	maxBackoff     = 30 * time.Second
+	maxBackoff     = 10 * time.Second
 )
 
 type AlpacaCredentials struct {
@@ -38,7 +38,6 @@ type AlpacaNewsProvider struct {
 	debug             bool
 	includeHistorical bool
 	historicalFetched bool
-	seenNewsIDs       map[string]struct{}
 }
 
 type NewAlpacaNewsProviderParams struct {
@@ -55,7 +54,6 @@ func NewAlpacaNewsProvider(params NewAlpacaNewsProviderParams) *AlpacaNewsProvid
 		newsChannel:       make(chan news.ExternalNews, 256),
 		debug:             params.Debug,
 		includeHistorical: params.IncludeHistorical,
-		seenNewsIDs:       make(map[string]struct{}),
 	}
 	go a.run()
 	return a
@@ -262,12 +260,6 @@ func (a *AlpacaNewsProvider) fetchHistoricalAndPublish(ctx context.Context) erro
 }
 
 func (a *AlpacaNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {
-	if ext.ID != "" {
-		if _, seen := a.seenNewsIDs[ext.ID]; seen {
-			return true
-		}
-		a.seenNewsIDs[ext.ID] = struct{}{}
-	}
 	select {
 	case <-ctx.Done():
 		return false

@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const mergedNewsChanSize = 256
+const (
+	mergedNewsChanSize = 256
+	maxSeenNewsIDs     = 100
+)
 
 type NewsProvider interface {
 	GetNewsChannel() <-chan ExternalNews
@@ -34,6 +37,8 @@ type NewsProcessor struct {
 	merged          chan ExternalNews // closed after all provider pumps exit
 	excludeKeywords []string
 	includeKeywords []string
+	seenMu          sync.Mutex
+	seenIDs         []string
 }
 
 type NewNewsProcessorParams struct {
@@ -89,6 +94,9 @@ func (n *NewsProcessor) start() {
 					if !n.headlineAllows(item.Headline) {
 						continue
 					}
+					if !n.recordIfNew(item.ID) {
+						continue
+					}
 					select {
 					case merged <- item:
 					case <-n.ctx.Done():
@@ -102,6 +110,25 @@ func (n *NewsProcessor) start() {
 		wg.Wait()
 		close(merged)
 	}()
+}
+
+// recordIfNew returns false if id was already seen. Empty ids are always accepted.
+func (n *NewsProcessor) recordIfNew(id string) bool {
+	if id == "" {
+		return true
+	}
+	n.seenMu.Lock()
+	defer n.seenMu.Unlock()
+	for _, seen := range n.seenIDs {
+		if seen == id {
+			return false
+		}
+	}
+	if len(n.seenIDs) >= maxSeenNewsIDs {
+		n.seenIDs = n.seenIDs[1:]
+	}
+	n.seenIDs = append(n.seenIDs, id)
+	return true
 }
 
 func (n *NewsProcessor) headlineAllows(headline string) bool {

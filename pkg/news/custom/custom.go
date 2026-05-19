@@ -15,7 +15,7 @@ import (
 
 const (
 	initialBackoff = time.Second
-	maxBackoff     = 30 * time.Second
+	maxBackoff     = 5 * time.Second
 )
 
 type CustomNewsProvider struct {
@@ -23,7 +23,6 @@ type CustomNewsProvider struct {
 	url         string
 	newsChannel chan news.ExternalNews
 	debug       bool
-	seenNewsIDs map[string]struct{}
 }
 
 type NewCustomNewsProviderParams struct {
@@ -42,7 +41,6 @@ func NewCustomNewsProvider(params NewCustomNewsProviderParams) (*CustomNewsProvi
 		url:         url,
 		newsChannel: make(chan news.ExternalNews, 256),
 		debug:       params.Debug,
-		seenNewsIDs: make(map[string]struct{}),
 	}
 	go c.run()
 	return c, nil
@@ -134,12 +132,6 @@ func (c *CustomNewsProvider) readLoop(ctx context.Context, conn *websocket.Conn)
 }
 
 func (c *CustomNewsProvider) pushNews(ctx context.Context, ext news.ExternalNews) bool {
-	if ext.ID != "" {
-		if _, seen := c.seenNewsIDs[ext.ID]; seen {
-			return true
-		}
-		c.seenNewsIDs[ext.ID] = struct{}{}
-	}
 	select {
 	case <-ctx.Done():
 		return false
